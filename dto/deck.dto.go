@@ -12,6 +12,10 @@ type UpdateDeckRequest struct {
 	Description string
 }
 
-type GetDeckRequest struct {
-	ID int32
+type GetDecksRequest struct {
+	ID     int32
+	Name   string
+	UserID int32
+	OffSet int
+	Limit  int
 }

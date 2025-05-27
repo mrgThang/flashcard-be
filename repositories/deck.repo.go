@@ -12,7 +12,7 @@ import (
 type DeckRepository interface {
 	CreateDeck(ctx context.Context, req dto.CreateDeckRequest, db ...*gorm.DB) error
 	UpdateDeck(ctx context.Context, req dto.UpdateDeckRequest, db ...*gorm.DB) error
-	GetDeck(ctx context.Context, req dto.GetDeckRequest, db ...*gorm.DB) (*models.Deck, error)
+	GetDecks(ctx context.Context, req dto.GetDecksRequest, db ...*gorm.DB) ([]*models.Deck, error)
 }
 
 type deckRepositoryImpl struct {
@@ -45,12 +45,28 @@ func (r *deckRepositoryImpl) UpdateDeck(ctx context.Context, req dto.UpdateDeckR
 	return database.WithContext(ctx).Model(&models.Deck{}).Where("id = ?", req.ID).Updates(updates).Error
 }
 
-func (r *deckRepositoryImpl) GetDeck(ctx context.Context, req dto.GetDeckRequest, dbs ...*gorm.DB) (*models.Deck, error) {
+func (r *deckRepositoryImpl) GetDecks(ctx context.Context, req dto.GetDecksRequest, dbs ...*gorm.DB) ([]*models.Deck, error) {
 	database := getDb(r.DB, dbs...)
-	var deck models.Deck
-	err := database.WithContext(ctx).First(&deck, req.ID).Error
+	var decks []*models.Deck
+	query := database.WithContext(ctx).Model(&models.Deck{})
+	if req.Name != "" {
+		query = query.Where("name LIKE ?", "%"+req.Name+"%")
+	}
+	if req.UserID != 0 {
+		query = query.Where("user_id = ?", req.UserID)
+	}
+	offset := 0
+	if req.OffSet > 0 {
+		offset = req.OffSet
+	}
+	limit := 10
+	if req.Limit > 0 {
+		limit = req.Limit
+	}
+	query = query.Offset(offset).Limit(limit)
+	err := query.Find(&decks).Error
 	if err != nil {
 		return nil, err
 	}
-	return &deck, nil
+	return decks, nil
 }
