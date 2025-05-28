@@ -6,19 +6,18 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
+
 	"github.com/mrgThang/flashcard-be/config"
 )
 
 func RunMigrations(migrationsDir string) {
-	cfg := config.LoadConfig() // Implement this to load DB config
+	cfg := &config.Config{}
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?multiStatements=true",
-		cfg.MYSQLCONFIG.USERNAME,
-		cfg.MYSQLCONFIG.PASSWORD,
-		cfg.MYSQLCONFIG.HOST,
-		cfg.MYSQLCONFIG.PORT,
-		cfg.MYSQLCONFIG.DATABASE,
-	)
+	dsn := cfg.MysqlConfig.DSN()
 
 	sourceURL := fmt.Sprintf("file://%s", migrationsDir)
 	m, err := migrate.New(
