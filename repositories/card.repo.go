@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/mrgThang/flashcard-be/constant"
 	"github.com/mrgThang/flashcard-be/dto"
 	"github.com/mrgThang/flashcard-be/models"
 )
@@ -12,7 +13,7 @@ import (
 type CardRepository interface {
 	CreateCard(ctx context.Context, req dto.CreateCardRequest, db ...*gorm.DB) error
 	UpdateCard(ctx context.Context, req dto.UpdateCardRequest, db ...*gorm.DB) error
-	GetCards(ctx context.Context, req dto.GetCardsRequest, db ...*gorm.DB) ([]*models.Card, error)
+	GetCards(ctx context.Context, req dto.GetCardsRequest, db ...*gorm.DB) ([]*models.Card, int64, error)
 }
 
 type cardRepositoryImpl struct {
@@ -45,7 +46,7 @@ func (r *cardRepositoryImpl) UpdateCard(ctx context.Context, req dto.UpdateCardR
 	return database.WithContext(ctx).Model(&models.Card{}).Where("id = ?", req.ID).Updates(updates).Error
 }
 
-func (r *cardRepositoryImpl) GetCards(ctx context.Context, req dto.GetCardsRequest, dbs ...*gorm.DB) ([]*models.Card, error) {
+func (r *cardRepositoryImpl) GetCards(ctx context.Context, req dto.GetCardsRequest, dbs ...*gorm.DB) ([]*models.Card, int64, error) {
 	database := getDb(r.DB, dbs...)
 	var cards []*models.Card
 	query := database.WithContext(ctx).Model(&models.Card{})
@@ -64,18 +65,26 @@ func (r *cardRepositoryImpl) GetCards(ctx context.Context, req dto.GetCardsReque
 	if req.Back != "" {
 		query = query.Where("back LIKE ?", "%"+req.Back+"%")
 	}
-	offset := 0
-	if req.OffSet > 0 {
-		offset = req.OffSet
+
+	offset := constant.DEFAULT_OFFSET
+	if req.Page > 0 {
+		offset = (req.Page - 1) * req.PageSize
 	}
-	limit := 10
-	if req.Limit > 0 {
-		limit = req.Limit
+	limit := constant.DEFAULT_LIMIT
+	if req.PageSize > 0 {
+		limit = req.PageSize
 	}
-	query = query.Offset(offset).Limit(limit)
-	err := query.Find(&cards).Error
+
+	var totalItems int64
+	err := query.Count(&totalItems).Error
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return cards, nil
+
+	query = query.Offset(offset).Limit(limit)
+	err = query.Find(&cards).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return cards, totalItems, nil
 }

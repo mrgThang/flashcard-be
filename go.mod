@@ -3,7 +3,9 @@ module github.com/mrgThang/flashcard-be
 go 1.24.3
 
 require (
+	github.com/go-chi/chi/v5 v5.2.1
 	github.com/spf13/viper v1.20.1
+	go.uber.org/zap v1.18.1
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.30.0
 )

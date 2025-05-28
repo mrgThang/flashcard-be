@@ -1,9 +1,6 @@
 package services
 
 import (
-	"log"
-	"os"
-
 	"gorm.io/gorm"
 
 	"github.com/mrgThang/flashcard-be/config"
@@ -17,7 +14,6 @@ type Service struct {
 	UserRepository repositories.UserRepository
 	DeckRepository repositories.DeckRepository
 	CardRepository repositories.CardRepository
-	Logger         *log.Logger // added logger
 }
 
 func NewService() *Service {
@@ -29,14 +25,11 @@ func NewService() *Service {
 
 	db := db.MustConnectMysql(cfg.MysqlConfig)
 
-	logger := log.New(os.Stdout, "[flashcard-be] ", log.LstdFlags)
-
 	return &Service{
 		Config:         cfg,
 		DB:             db,
 		UserRepository: repositories.NewUserRepository(db),
 		DeckRepository: repositories.NewDeckRepository(db),
 		CardRepository: repositories.NewCardRepository(db),
-		Logger:         logger,
 	}
 }

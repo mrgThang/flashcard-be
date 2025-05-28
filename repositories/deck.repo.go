@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/mrgThang/flashcard-be/constant"
 	"github.com/mrgThang/flashcard-be/dto"
 	"github.com/mrgThang/flashcard-be/models"
 )
@@ -12,7 +13,7 @@ import (
 type DeckRepository interface {
 	CreateDeck(ctx context.Context, req dto.CreateDeckRequest, db ...*gorm.DB) error
 	UpdateDeck(ctx context.Context, req dto.UpdateDeckRequest, db ...*gorm.DB) error
-	GetDecks(ctx context.Context, req dto.GetDecksRequest, db ...*gorm.DB) ([]*models.Deck, error)
+	GetDecksWithPagination(ctx context.Context, req dto.GetDecksRequest, db ...*gorm.DB) ([]*models.Deck, int64, error)
 }
 
 type deckRepositoryImpl struct {
@@ -45,7 +46,7 @@ func (r *deckRepositoryImpl) UpdateDeck(ctx context.Context, req dto.UpdateDeckR
 	return database.WithContext(ctx).Model(&models.Deck{}).Where("id = ?", req.ID).Updates(updates).Error
 }
 
-func (r *deckRepositoryImpl) GetDecks(ctx context.Context, req dto.GetDecksRequest, dbs ...*gorm.DB) ([]*models.Deck, error) {
+func (r *deckRepositoryImpl) GetDecksWithPagination(ctx context.Context, req dto.GetDecksRequest, dbs ...*gorm.DB) ([]*models.Deck, int64, error) {
 	database := getDb(r.DB, dbs...)
 	var decks []*models.Deck
 	query := database.WithContext(ctx).Model(&models.Deck{})
@@ -55,18 +56,26 @@ func (r *deckRepositoryImpl) GetDecks(ctx context.Context, req dto.GetDecksReque
 	if req.UserID != 0 {
 		query = query.Where("user_id = ?", req.UserID)
 	}
-	offset := 0
-	if req.OffSet > 0 {
-		offset = req.OffSet
+	offset := constant.DEFAULT_OFFSET
+	if req.Page > 0 {
+		offset = (req.Page - 1) * req.PageSize
 	}
-	limit := 10
-	if req.Limit > 0 {
-		limit = req.Limit
+	limit := constant.DEFAULT_LIMIT
+	if req.PageSize > 0 {
+		limit = req.PageSize
 	}
-	query = query.Offset(offset).Limit(limit)
-	err := query.Find(&decks).Error
+
+	var totalItems int64
+	err := query.Count(&totalItems).Error
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return decks, nil
+
+	query = query.Offset(offset).Limit(limit)
+	err = query.Find(&decks).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return decks, totalItems, nil
 }

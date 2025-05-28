@@ -12,7 +12,7 @@ import (
 type UserRepository interface {
 	CreateUser(ctx context.Context, req dto.CreateUserRequest, db ...*gorm.DB) error
 	UpdateUser(ctx context.Context, req dto.UpdateUserRequest, db ...*gorm.DB) error
-	GetUsers(ctx context.Context, req dto.GetUserRequest, db ...*gorm.DB) (*models.User, error)
+	GetUser(ctx context.Context, req dto.GetUserRequest, db ...*gorm.DB) (*models.User, error)
 }
 
 type userRepositoryImpl struct {
@@ -48,7 +48,7 @@ func (r *userRepositoryImpl) UpdateUser(ctx context.Context, req dto.UpdateUserR
 	return database.WithContext(ctx).Model(&models.User{}).Where("id = ?", req.ID).Updates(updates).Error
 }
 
-func (r *userRepositoryImpl) GetUsers(ctx context.Context, req dto.GetUserRequest, dbs ...*gorm.DB) (*models.User, error) {
+func (r *userRepositoryImpl) GetUser(ctx context.Context, req dto.GetUserRequest, dbs ...*gorm.DB) (*models.User, error) {
 	database := getDb(r.DB, dbs...)
 	var user models.User
 	err := database.WithContext(ctx).First(&user, req.ID).Error
