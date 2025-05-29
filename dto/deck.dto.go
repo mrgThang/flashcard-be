@@ -3,7 +3,7 @@ package dto
 type CreateDeckRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	UserID      int32  `json:"userId"`
+	UserID      int32
 }
 
 type UpdateDeckRequest struct {
@@ -13,11 +13,11 @@ type UpdateDeckRequest struct {
 }
 
 type GetDecksRequest struct {
-	ID       int32  `json:"id"`
-	Name     string `json:"name"`
-	UserID   int32  `json:"userId"`
-	Page     int    `json:"page"`
-	PageSize int    `json:"pageSize"`
+	ID       int32
+	Name     string
+	UserID   int32
+	Page     int
+	PageSize int
 }
 
 type GetDecksResponse struct {
@@ -26,7 +26,6 @@ type GetDecksResponse struct {
 }
 
 type DeckItem struct {
-	ID     int32  `json:"id"`
-	Name   string `json:"name"`
-	UserID int32  `json:"userId"`
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
 }

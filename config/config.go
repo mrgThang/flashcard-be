@@ -11,10 +11,11 @@ type MysqlConfig struct {
 	Username string
 	Password string
 	Database string
+	Options  string
 }
 
 func (config *MysqlConfig) DSN() string {
-	return config.Username + ":" + config.Password + "@tcp(" + config.Host + ":" + config.Port + ")/" + config.Database
+	return config.Username + ":" + config.Password + "@tcp(" + config.Host + ":" + config.Port + ")/" + config.Database + "?" + config.Options
 }
 
 func loadDefaultConfig() *Config {

@@ -19,14 +19,18 @@ func (s *Service) GetCardsHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseGetCardsRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[GetCardsHandler] Invalid request parameters", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
+	// TODO: need logic enrich userID from token
+	userId := int32(0)
+
+	req.UserID = userId
 	cards, totalItems, err := s.CardRepository.GetCards(r.Context(), *req)
 	if err != nil {
 		logger.Error("[GetCardsHandler] CardRepository.GetCards", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusNotFound)
+		WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -35,9 +39,7 @@ func (s *Service) GetCardsHandler(w http.ResponseWriter, r *http.Request) {
 		PageSize:   req.PageSize,
 		TotalItems: totalItems,
 	})
-	w.WriteHeader(response.Code)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (s *Service) parseGetCardsRequest(ctx context.Context, r *http.Request) (*dto.GetCardsRequest, error) {
@@ -57,13 +59,6 @@ func (s *Service) parseGetCardsRequest(ctx context.Context, r *http.Request) (*d
 			return nil, fmt.Errorf("invalid deckId")
 		}
 		req.DeckID = int32(deckID)
-	}
-	if userIDStr := q.Get("userId"); userIDStr != "" {
-		userID, err := strconv.Atoi(userIDStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid userId")
-		}
-		req.UserID = int32(userID)
 	}
 	req.Front = q.Get("front")
 	req.Back = q.Get("back")
@@ -88,7 +83,7 @@ func (s *Service) parseGetCardsRequest(ctx context.Context, r *http.Request) (*d
 	return &req, nil
 }
 
-func (s *Service) parseGetCardsResponse(cards []*models.Card, pagination dto.Pagination) ApiResponse[dto.GetCardsResponse] {
+func (s *Service) parseGetCardsResponse(cards []*models.Card, pagination dto.Pagination) dto.GetCardsResponse {
 	cardItems := make([]dto.CardItem, len(cards))
 	for i, card := range cards {
 		cardItems[i] = dto.CardItem{
@@ -96,16 +91,11 @@ func (s *Service) parseGetCardsResponse(cards []*models.Card, pagination dto.Pag
 			Front:  card.Front,
 			Back:   card.Back,
 			DeckID: card.DeckID,
-			UserID: card.UserID,
 		}
 	}
-	return ApiResponse[dto.GetCardsResponse]{
-		Code:    http.StatusOK,
-		Message: "Success",
-		Data: dto.GetCardsResponse{
-			Pagination: pagination,
-			Cards:      cardItems,
-		},
+	return dto.GetCardsResponse{
+		Pagination: pagination,
+		Cards:      cardItems,
 	}
 }
 
@@ -113,72 +103,108 @@ func (s *Service) CreateCardHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseCreateCardRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[CreateCardHandler] Invalid request body", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
+
+	//TODO: need logic enrich userID from token
+	userId := int32(0)
+
+	deck, err := s.DeckRepository.GetDetailDeck(r.Context(), req.DeckID)
+	if err != nil {
+		logger.Error("[CreateCardHandler] DeckRepository.GetDetailDeck", zap.Error(err))
+		WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if deck == nil {
+		logger.Error("[CreateCardHandler] Deck not found", zap.Int32("deckId", req.DeckID))
+		WriteJSONError(w, http.StatusNotFound, fmt.Errorf("deck not found"))
+		return
+	}
+	if deck.UserID != userId {
+		logger.Error("[CreateCardHandler] User does not have permission to create card in this deck", zap.Int32("deckId", req.DeckID), zap.Int32("userId", req.UserID))
+		WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to create card in this deck"))
+		return
+	}
+
+	req.UserID = userId
 	err = s.CardRepository.CreateCard(r.Context(), *req)
-	response := s.parseCreateCardResponse(err)
-	w.WriteHeader(response.Code)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err != nil {
+		logger.Error("[CreateCardHandler] CardRepository.CreateCard", zap.Error(err))
+		WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	WriteJSONResponse(w, http.StatusCreated, any(nil))
 }
 
 func (s *Service) parseCreateCardRequest(ctx context.Context, r *http.Request) (*dto.CreateCardRequest, error) {
 	var req dto.CreateCardRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return nil, fmt.Errorf("invalid request body")
+		logger.Error("[parseCreateCardRequest] Failed to decode request", zap.Error(err))
+		return nil, err
+	}
+	if req.DeckID == 0 {
+		logger.Error("[parseCreateCardRequest] DeckID is required")
+		return nil, fmt.Errorf("deckId is required")
+	}
+	if req.Front == "" {
+		logger.Error("[parseCreateCardRequest] Front is required")
+		return nil, fmt.Errorf("front is required")
+	}
+	if req.Back == "" {
+		logger.Error("[parseCreateCardRequest] Back is required")
+		return nil, fmt.Errorf("back is required")
 	}
 	return &req, nil
-}
-
-func (s *Service) parseCreateCardResponse(err error) ApiResponse[any] {
-	if err != nil {
-		return ApiResponse[any]{
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-			Data:    nil,
-		}
-	}
-	return ApiResponse[any]{
-		Code:    http.StatusCreated,
-		Message: "Card created successfully",
-		Data:    nil,
-	}
 }
 
 func (s *Service) UpdateCardHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseUpdateCardRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[UpdateCardHandler] Invalid request body", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
+
+	// TODO: need logic enrich userID from token
+	userId := int32(0)
+
+	card, err := s.CardRepository.GetDetailCard(r.Context(), req.ID)
+	if err != nil {
+		logger.Error("[UpdateCardHandler] CardRepository.GetDetailCard", zap.Error(err))
+		WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if card == nil {
+		logger.Error("[UpdateCardHandler] Card not found", zap.Int32("cardId", req.ID))
+		WriteJSONError(w, http.StatusNotFound, fmt.Errorf("card not found"))
+		return
+	}
+	if card.UserID != userId {
+		logger.Error("[UpdateCardHandler] User does not have permission to update this card", zap.Int32("cardId", req.ID), zap.Int32("userId", userId))
+		WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to update this card"))
+		return
+	}
+
 	err = s.CardRepository.UpdateCard(r.Context(), *req)
-	response := s.parseUpdateCardResponse(err)
-	w.WriteHeader(response.Code)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err != nil {
+		logger.Error("[UpdateCardHandler] CardRepository.UpdateCard", zap.Error(err))
+		WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	WriteJSONResponse(w, http.StatusOK, any(nil))
 }
 
 func (s *Service) parseUpdateCardRequest(ctx context.Context, r *http.Request) (*dto.UpdateCardRequest, error) {
 	var req dto.UpdateCardRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return nil, fmt.Errorf("invalid request body")
+		logger.Error("[parseUpdateCardRequest] Failed to decode request", zap.Error(err))
+		return nil, err
+	}
+	if req.ID == 0 {
+		logger.Error("[parseUpdateCardRequest] ID is required")
+		return nil, fmt.Errorf("id is required")
 	}
 	return &req, nil
-}
-
-func (s *Service) parseUpdateCardResponse(err error) ApiResponse[any] {
-	if err != nil {
-		return ApiResponse[any]{
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-			Data:    nil,
-		}
-	}
-	return ApiResponse[any]{
-		Code:    http.StatusOK,
-		Message: "Card updated successfully",
-		Data:    nil,
-	}
 }

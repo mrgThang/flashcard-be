@@ -19,14 +19,18 @@ func (s *Service) GetDecksHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseGetDecksRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[GetDecksHandler] Invalid request parameters", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
+	// TODO: need logic enrich userID from token
+	userId := int32(0)
+
+	req.UserID = userId
 	decks, totalItems, err := s.DeckRepository.GetDecksWithPagination(r.Context(), *req)
 	if err != nil {
 		logger.Error("[GetDecksHandler] DeckRepository.GetDecks", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusNotFound)
+		WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -35,9 +39,7 @@ func (s *Service) GetDecksHandler(w http.ResponseWriter, r *http.Request) {
 		PageSize:   req.PageSize,
 		TotalItems: totalItems,
 	})
-	w.WriteHeader(response.Code)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (s *Service) parseGetDecksRequest(ctx context.Context, r *http.Request) (*dto.GetDecksRequest, error) {
@@ -52,13 +54,6 @@ func (s *Service) parseGetDecksRequest(ctx context.Context, r *http.Request) (*d
 		req.ID = int32(id)
 	}
 	req.Name = q.Get("name")
-	if userIDStr := q.Get("userId"); userIDStr != "" {
-		userID, err := strconv.Atoi(userIDStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid userId")
-		}
-		req.UserID = int32(userID)
-	}
 	if pageStr := q.Get("page"); pageStr != "" {
 		page, err := strconv.Atoi(pageStr)
 		if err != nil {
@@ -80,22 +75,17 @@ func (s *Service) parseGetDecksRequest(ctx context.Context, r *http.Request) (*d
 	return &req, nil
 }
 
-func (s *Service) parseGetDecksResponse(decks []*models.Deck, pagination dto.Pagination) ApiResponse[dto.GetDecksResponse] {
+func (s *Service) parseGetDecksResponse(decks []*models.Deck, pagination dto.Pagination) dto.GetDecksResponse {
 	deckItems := make([]dto.DeckItem, len(decks))
 	for i, deck := range decks {
 		deckItems[i] = dto.DeckItem{
-			ID:     deck.ID,
-			Name:   deck.Name,
-			UserID: deck.UserID,
+			ID:   deck.ID,
+			Name: deck.Name,
 		}
 	}
-	return ApiResponse[dto.GetDecksResponse]{
-		Code:    http.StatusOK,
-		Message: "Success",
-		Data: dto.GetDecksResponse{
-			Pagination: pagination,
-			Decks:      deckItems,
-		},
+	return dto.GetDecksResponse{
+		Pagination: pagination,
+		Decks:      deckItems,
 	}
 }
 
@@ -106,69 +96,79 @@ func (s *Service) CreateDeckHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	// TODO: need logic enrich userID from token
+	userId := int32(0)
+
+	req.UserID = userId
 	err = s.DeckRepository.CreateDeck(r.Context(), *req)
-	response := s.parseCreateDeckResponse(err)
-	w.WriteHeader(response.Code)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err != nil {
+		logger.Error("[CreateDeckHandler] DeckRepository.CreateDeck got error", zap.Error(err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	WriteJSONResponse(w, http.StatusCreated, any(nil))
 }
 
 func (s *Service) parseCreateDeckRequest(ctx context.Context, r *http.Request) (*dto.CreateDeckRequest, error) {
 	var req dto.CreateDeckRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return nil, fmt.Errorf("invalid request body")
+		logger.Error("[parseCreateDeckRequest] Decode json from req got error", zap.Error(err))
+		return nil, err
+	}
+	if req.Name == "" {
+		logger.Error("[parseCreateDeckRequest] Name is required")
+		return nil, fmt.Errorf("Name is required")
 	}
 	return &req, nil
-}
-
-func (s *Service) parseCreateDeckResponse(err error) ApiResponse[any] {
-	if err != nil {
-		return ApiResponse[any]{
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-			Data:    nil,
-		}
-	}
-	return ApiResponse[any]{
-		Code:    http.StatusCreated,
-		Message: "Deck created successfully",
-		Data:    nil,
-	}
 }
 
 func (s *Service) UpdateDeckHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseUpdateDeckRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[UpdateDeckHandler] Invalid request body", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
+
+	// TODO: need logic enrich userID from token
+	userId := int32(0)
+
+	deck, err := s.DeckRepository.GetDetailDeck(r.Context(), req.ID)
+	if err != nil {
+		logger.Error("[UpdateDeckHandler] DeckRepository.GetDetailDeck got error", zap.Error(err))
+		WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if deck == nil {
+		logger.Error("[UpdateDeckHandler] Deck not found", zap.Int32("deckId", req.ID))
+		WriteJSONError(w, http.StatusNotFound, fmt.Errorf("deck not found"))
+		return
+	}
+	if deck.UserID != userId {
+		logger.Error("[UpdateDeckHandler] User does not have permission to update this deck", zap.Int32("deckId", req.ID), zap.Int32("userId", userId))
+		WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to update this deck"))
+		return
+	}
+
 	err = s.DeckRepository.UpdateDeck(r.Context(), *req)
-	response := s.parseUpdateDeckResponse(err)
-	w.WriteHeader(response.Code)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err != nil {
+		logger.Error("[UpdateDeckHandler] DeckRepository.UpdateDeck got error", zap.Error(err))
+		WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	WriteJSONResponse(w, http.StatusOK, any(nil))
 }
 
 func (s *Service) parseUpdateDeckRequest(ctx context.Context, r *http.Request) (*dto.UpdateDeckRequest, error) {
 	var req dto.UpdateDeckRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return nil, fmt.Errorf("invalid request body")
+		logger.Error("[parseUpdateDeckRequest] Decode json from req got error", zap.Error(err))
+		return nil, err
+	}
+	if req.ID == 0 {
+		logger.Error("[parseUpdateDeckRequest] ID is required")
+		return nil, fmt.Errorf("ID is required")
 	}
 	return &req, nil
-}
-
-func (s *Service) parseUpdateDeckResponse(err error) ApiResponse[any] {
-	if err != nil {
-		return ApiResponse[any]{
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-			Data:    nil,
-		}
-	}
-	return ApiResponse[any]{
-		Code:    http.StatusOK,
-		Message: "Deck updated successfully",
-		Data:    nil,
-	}
 }

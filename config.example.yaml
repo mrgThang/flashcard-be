@@ -4,5 +4,6 @@ MYSQLCONFIG:
   USERNAME: root
   PASSWORD: secret
   DATABASE: flashcard
+  OPTIONS: parseTime=true
 
 PORT: 8080

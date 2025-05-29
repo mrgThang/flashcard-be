@@ -4,7 +4,7 @@ type CreateCardRequest struct {
 	Front  string `json:"front"`
 	Back   string `json:"back"`
 	DeckID int32  `json:"deckId"`
-	UserID int32  `json:"userId"`
+	UserID int32
 }
 
 type UpdateCardRequest struct {
@@ -14,13 +14,13 @@ type UpdateCardRequest struct {
 }
 
 type GetCardsRequest struct {
-	ID       int32  `json:"id"`
-	DeckID   int32  `json:"deckId"`
-	UserID   int32  `json:"userId"`
-	Front    string `json:"front"`
-	Back     string `json:"back"`
-	Page     int    `json:"page"`
-	PageSize int    `json:"pageSize"`
+	ID       int32
+	DeckID   int32
+	UserID   int32
+	Front    string
+	Back     string
+	Page     int
+	PageSize int
 }
 
 type GetCardsResponse struct {
@@ -33,5 +33,4 @@ type CardItem struct {
 	Front  string `json:"front"`
 	Back   string `json:"back"`
 	DeckID int32  `json:"deckId"`
-	UserID int32  `json:"userId"`
 }

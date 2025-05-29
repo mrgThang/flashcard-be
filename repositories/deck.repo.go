@@ -2,11 +2,14 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/mrgThang/flashcard-be/constant"
 	"github.com/mrgThang/flashcard-be/dto"
+	"github.com/mrgThang/flashcard-be/logger"
 	"github.com/mrgThang/flashcard-be/models"
 )
 
@@ -14,6 +17,7 @@ type DeckRepository interface {
 	CreateDeck(ctx context.Context, req dto.CreateDeckRequest, db ...*gorm.DB) error
 	UpdateDeck(ctx context.Context, req dto.UpdateDeckRequest, db ...*gorm.DB) error
 	GetDecksWithPagination(ctx context.Context, req dto.GetDecksRequest, db ...*gorm.DB) ([]*models.Deck, int64, error)
+	GetDetailDeck(ctx context.Context, id int32, dbs ...*gorm.DB) (*models.Deck, error)
 }
 
 type deckRepositoryImpl struct {
@@ -78,4 +82,15 @@ func (r *deckRepositoryImpl) GetDecksWithPagination(ctx context.Context, req dto
 	}
 
 	return decks, totalItems, nil
+}
+
+func (r *deckRepositoryImpl) GetDetailDeck(ctx context.Context, id int32, dbs ...*gorm.DB) (*models.Deck, error) {
+	database := getDb(r.DB, dbs...)
+	var deck models.Deck
+	err := database.WithContext(ctx).Where("id = ?", id).First(&deck).Error
+	if err != nil {
+		logger.Error(fmt.Sprintf("[GetDetailDeck] Error fetching deck with ID %d", id), zap.Error(err))
+		return nil, err
+	}
+	return &deck, nil
 }

@@ -3,10 +3,12 @@ package repositories
 import (
 	"context"
 
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/mrgThang/flashcard-be/constant"
 	"github.com/mrgThang/flashcard-be/dto"
+	"github.com/mrgThang/flashcard-be/logger"
 	"github.com/mrgThang/flashcard-be/models"
 )
 
@@ -14,6 +16,7 @@ type CardRepository interface {
 	CreateCard(ctx context.Context, req dto.CreateCardRequest, db ...*gorm.DB) error
 	UpdateCard(ctx context.Context, req dto.UpdateCardRequest, db ...*gorm.DB) error
 	GetCards(ctx context.Context, req dto.GetCardsRequest, db ...*gorm.DB) ([]*models.Card, int64, error)
+	GetDetailCard(ctx context.Context, id int32, dbs ...*gorm.DB) (*models.Card, error)
 }
 
 type cardRepositoryImpl struct {
@@ -87,4 +90,15 @@ func (r *cardRepositoryImpl) GetCards(ctx context.Context, req dto.GetCardsReque
 		return nil, 0, err
 	}
 	return cards, totalItems, nil
+}
+
+func (r *cardRepositoryImpl) GetDetailCard(ctx context.Context, id int32, dbs ...*gorm.DB) (*models.Card, error) {
+	database := getDb(r.DB, dbs...)
+	var card models.Card
+	err := database.WithContext(ctx).Model(models.Card{}).Where("id = ?", id).First(&card).Error
+	if err != nil {
+		logger.Error("[GetDetailCard] got error", zap.Error(err))
+		return nil, err
+	}
+	return &card, nil
 }

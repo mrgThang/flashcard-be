@@ -2,4 +2,4 @@ migrate-up:
 	go run main.go migrate
 
 run:
-	go run main.go server
+	go run main.go serve
