@@ -52,7 +52,9 @@ func main() {
 }
 
 func runServer() error {
-	logger.Init()
+	if err := logger.Init(); err != nil {
+		panic(err)
+	}
 	service := services.NewService()
 
 	r := chi.NewRouter()

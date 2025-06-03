@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,7 +16,7 @@ import (
 )
 
 func (s *Service) GetCardsHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseGetCardsRequest(r.Context(), r)
+	req, err := s.parseGetCardsRequest(r)
 	if err != nil {
 		logger.Error("[GetCardsHandler] Invalid request parameters", zap.Error(err))
 		helpers.WriteJSONError(w, http.StatusBadRequest, err)
@@ -47,7 +46,7 @@ func (s *Service) GetCardsHandler(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJSONResponse(w, http.StatusOK, response)
 }
 
-func (s *Service) parseGetCardsRequest(ctx context.Context, r *http.Request) (*dto.GetCardsRequest, error) {
+func (s *Service) parseGetCardsRequest(r *http.Request) (*dto.GetCardsRequest, error) {
 	q := r.URL.Query()
 	var req dto.GetCardsRequest
 
@@ -105,7 +104,7 @@ func (s *Service) parseGetCardsResponse(cards []*models.Card, pagination dto.Pag
 }
 
 func (s *Service) CreateCardHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseCreateCardRequest(r.Context(), r)
+	req, err := s.parseCreateCardRequest(r)
 	if err != nil {
 		logger.Error("[CreateCardHandler] Invalid request body", zap.Error(err))
 		helpers.WriteJSONError(w, http.StatusBadRequest, err)
@@ -147,7 +146,7 @@ func (s *Service) CreateCardHandler(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJSONResponse(w, http.StatusCreated, any(nil))
 }
 
-func (s *Service) parseCreateCardRequest(ctx context.Context, r *http.Request) (*dto.CreateCardRequest, error) {
+func (s *Service) parseCreateCardRequest(r *http.Request) (*dto.CreateCardRequest, error) {
 	var req dto.CreateCardRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Error("[parseCreateCardRequest] Failed to decode request", zap.Error(err))
@@ -169,7 +168,7 @@ func (s *Service) parseCreateCardRequest(ctx context.Context, r *http.Request) (
 }
 
 func (s *Service) UpdateCardHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseUpdateCardRequest(r.Context(), r)
+	req, err := s.parseUpdateCardRequest(r)
 	if err != nil {
 		logger.Error("[UpdateCardHandler] Invalid request body", zap.Error(err))
 		helpers.WriteJSONError(w, http.StatusBadRequest, err)
@@ -209,7 +208,7 @@ func (s *Service) UpdateCardHandler(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJSONResponse(w, http.StatusOK, any(nil))
 }
 
-func (s *Service) parseUpdateCardRequest(ctx context.Context, r *http.Request) (*dto.UpdateCardRequest, error) {
+func (s *Service) parseUpdateCardRequest(r *http.Request) (*dto.UpdateCardRequest, error) {
 	var req dto.UpdateCardRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Error("[parseUpdateCardRequest] Failed to decode request", zap.Error(err))

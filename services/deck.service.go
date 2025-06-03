@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,7 +16,7 @@ import (
 )
 
 func (s *Service) GetDecksHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseGetDecksRequest(r.Context(), r)
+	req, err := s.parseGetDecksRequest(r)
 	if err != nil {
 		logger.Error("[GetDecksHandler] Invalid request parameters", zap.Error(err))
 		helpers.WriteJSONError(w, http.StatusBadRequest, err)
@@ -47,7 +46,7 @@ func (s *Service) GetDecksHandler(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJSONResponse(w, http.StatusOK, response)
 }
 
-func (s *Service) parseGetDecksRequest(ctx context.Context, r *http.Request) (*dto.GetDecksRequest, error) {
+func (s *Service) parseGetDecksRequest(r *http.Request) (*dto.GetDecksRequest, error) {
 	q := r.URL.Query()
 	var req dto.GetDecksRequest
 
@@ -95,7 +94,7 @@ func (s *Service) parseGetDecksResponse(decks []*models.Deck, pagination dto.Pag
 }
 
 func (s *Service) CreateDeckHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseCreateDeckRequest(r.Context(), r)
+	req, err := s.parseCreateDeckRequest(r)
 	if err != nil {
 		logger.Error("[CreateDeckHandler] Invalid request body", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -119,7 +118,7 @@ func (s *Service) CreateDeckHandler(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJSONResponse(w, http.StatusCreated, any(nil))
 }
 
-func (s *Service) parseCreateDeckRequest(ctx context.Context, r *http.Request) (*dto.CreateDeckRequest, error) {
+func (s *Service) parseCreateDeckRequest(r *http.Request) (*dto.CreateDeckRequest, error) {
 	var req dto.CreateDeckRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Error("[parseCreateDeckRequest] Decode json from req got error", zap.Error(err))
@@ -133,7 +132,7 @@ func (s *Service) parseCreateDeckRequest(ctx context.Context, r *http.Request) (
 }
 
 func (s *Service) UpdateDeckHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseUpdateDeckRequest(r.Context(), r)
+	req, err := s.parseUpdateDeckRequest(r)
 	if err != nil {
 		logger.Error("[UpdateDeckHandler] Invalid request body", zap.Error(err))
 		helpers.WriteJSONError(w, http.StatusBadRequest, err)
@@ -173,7 +172,7 @@ func (s *Service) UpdateDeckHandler(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJSONResponse(w, http.StatusOK, any(nil))
 }
 
-func (s *Service) parseUpdateDeckRequest(ctx context.Context, r *http.Request) (*dto.UpdateDeckRequest, error) {
+func (s *Service) parseUpdateDeckRequest(r *http.Request) (*dto.UpdateDeckRequest, error) {
 	var req dto.UpdateDeckRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Error("[parseUpdateDeckRequest] Decode json from req got error", zap.Error(err))

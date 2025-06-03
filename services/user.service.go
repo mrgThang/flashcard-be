@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +40,7 @@ func (s *Service) parseGetUserResponse(user models.User) dto.GetUserResponse {
 }
 
 func (s *Service) SignupHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseSignupRequest(r.Context(), r)
+	req, err := s.parseSignupRequest(r)
 	if err != nil {
 		logger.Error("[SignUpHandler] Invalid request body", zap.Error(err))
 		helpers.WriteJSONError(w, http.StatusBadRequest, err)
@@ -65,7 +64,7 @@ func (s *Service) SignupHandler(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJSONResponse(w, http.StatusOK, any(nil))
 }
 
-func (s *Service) parseSignupRequest(ctx context.Context, r *http.Request) (*dto.CreateUserRequest, error) {
+func (s *Service) parseSignupRequest(r *http.Request) (*dto.CreateUserRequest, error) {
 	var req dto.CreateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Error("[parseSignupRequest] Failed to decode request body", zap.Error(err))
@@ -84,7 +83,7 @@ func (s *Service) parseSignupRequest(ctx context.Context, r *http.Request) (*dto
 }
 
 func (s *Service) LoginHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseLoginRequest(r.Context(), r)
+	req, err := s.parseLoginRequest(r)
 	if err != nil {
 		logger.Error("[LoginHandler] Failed to parse request", zap.Error(err))
 		helpers.WriteJSONError(w, http.StatusBadRequest, err)
@@ -140,7 +139,7 @@ func (s *Service) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Service) parseLoginRequest(ctx context.Context, r *http.Request) (*dto.LoginRequest, error) {
+func (s *Service) parseLoginRequest(r *http.Request) (*dto.LoginRequest, error) {
 	var req *dto.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		logger.Error("[parseLoginRequest] Failed to decode request body", zap.Error(err))
