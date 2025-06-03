@@ -1,8 +1,10 @@
 package constant
 
 const (
-	DEFAULT_OFFSET    = 0
-	DEFAULT_LIMIT     = 10
-	DEFAULT_PAGE      = 1
-	DEFAULT_PAGE_SIZE = 10
+	DefaultOffset   = 0
+	DefaultLimit    = 10
+	DefaultPage     = 1
+	DefaultPageSize = 10
 )
+
+const UserContextKey = "user_context_key"

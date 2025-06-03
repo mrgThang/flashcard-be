@@ -11,7 +11,6 @@ import (
 
 type UserRepository interface {
 	CreateUser(ctx context.Context, req dto.CreateUserRequest, db ...*gorm.DB) error
-	UpdateUser(ctx context.Context, req dto.UpdateUserRequest, db ...*gorm.DB) error
 	GetUser(ctx context.Context, req dto.GetUserRequest, db ...*gorm.DB) (*models.User, error)
 }
 
@@ -33,25 +32,17 @@ func (r *userRepositoryImpl) CreateUser(ctx context.Context, req dto.CreateUserR
 	return database.WithContext(ctx).Create(&user).Error
 }
 
-func (r *userRepositoryImpl) UpdateUser(ctx context.Context, req dto.UpdateUserRequest, dbs ...*gorm.DB) error {
-	database := getDb(r.DB, dbs...)
-	updates := map[string]interface{}{}
-	if req.Name != "" {
-		updates["name"] = req.Name
-	}
-	if req.Email != "" {
-		updates["email"] = req.Email
-	}
-	if req.Password != "" {
-		updates["password"] = req.Password
-	}
-	return database.WithContext(ctx).Model(&models.User{}).Where("id = ?", req.ID).Updates(updates).Error
-}
-
 func (r *userRepositoryImpl) GetUser(ctx context.Context, req dto.GetUserRequest, dbs ...*gorm.DB) (*models.User, error) {
 	database := getDb(r.DB, dbs...)
 	var user models.User
-	err := database.WithContext(ctx).First(&user, req.ID).Error
+	query := database.WithContext(ctx).Model(models.User{})
+	if req.ID > 0 {
+		query = query.Where("id = ?", req.ID)
+	}
+	if len(req.Email) > 0 {
+		query = query.Where("email = ?", req.Email)
+	}
+	err := query.First(&user).Error
 	if err != nil {
 		return nil, err
 	}

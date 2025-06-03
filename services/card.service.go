@@ -11,6 +11,7 @@ import (
 
 	"github.com/mrgThang/flashcard-be/constant"
 	"github.com/mrgThang/flashcard-be/dto"
+	"github.com/mrgThang/flashcard-be/helpers"
 	"github.com/mrgThang/flashcard-be/logger"
 	"github.com/mrgThang/flashcard-be/models"
 )
@@ -19,18 +20,22 @@ func (s *Service) GetCardsHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseGetCardsRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[GetCardsHandler] Invalid request parameters", zap.Error(err))
-		WriteJSONError(w, http.StatusBadRequest, err)
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	// TODO: need logic enrich userID from token
-	userId := int32(0)
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[GetCardsHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
+		return
+	}
 
-	req.UserID = userId
+	req.UserID = user.ID
 	cards, totalItems, err := s.CardRepository.GetCards(r.Context(), *req)
 	if err != nil {
 		logger.Error("[GetCardsHandler] CardRepository.GetCards", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -39,7 +44,7 @@ func (s *Service) GetCardsHandler(w http.ResponseWriter, r *http.Request) {
 		PageSize:   req.PageSize,
 		TotalItems: totalItems,
 	})
-	WriteJSONResponse(w, http.StatusOK, response)
+	helpers.WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (s *Service) parseGetCardsRequest(ctx context.Context, r *http.Request) (*dto.GetCardsRequest, error) {
@@ -69,7 +74,7 @@ func (s *Service) parseGetCardsRequest(ctx context.Context, r *http.Request) (*d
 		}
 		req.Page = page
 	} else {
-		req.Page = constant.DEFAULT_PAGE
+		req.Page = constant.DefaultPage
 	}
 	if pageSizeStr := q.Get("pageSize"); pageSizeStr != "" {
 		pageSize, err := strconv.Atoi(pageSizeStr)
@@ -78,7 +83,7 @@ func (s *Service) parseGetCardsRequest(ctx context.Context, r *http.Request) (*d
 		}
 		req.PageSize = pageSize
 	} else {
-		req.PageSize = constant.DEFAULT_PAGE_SIZE
+		req.PageSize = constant.DefaultPageSize
 	}
 	return &req, nil
 }
@@ -103,39 +108,43 @@ func (s *Service) CreateCardHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseCreateCardRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[CreateCardHandler] Invalid request body", zap.Error(err))
-		WriteJSONError(w, http.StatusBadRequest, err)
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	//TODO: need logic enrich userID from token
-	userId := int32(0)
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[GetCardsHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
+		return
+	}
 
 	deck, err := s.DeckRepository.GetDetailDeck(r.Context(), req.DeckID)
 	if err != nil {
 		logger.Error("[CreateCardHandler] DeckRepository.GetDetailDeck", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 	if deck == nil {
 		logger.Error("[CreateCardHandler] Deck not found", zap.Int32("deckId", req.DeckID))
-		WriteJSONError(w, http.StatusNotFound, fmt.Errorf("deck not found"))
+		helpers.WriteJSONError(w, http.StatusNotFound, fmt.Errorf("deck not found"))
 		return
 	}
-	if deck.UserID != userId {
+	if deck.UserID != user.ID {
 		logger.Error("[CreateCardHandler] User does not have permission to create card in this deck", zap.Int32("deckId", req.DeckID), zap.Int32("userId", req.UserID))
-		WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to create card in this deck"))
+		helpers.WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to create card in this deck"))
 		return
 	}
 
-	req.UserID = userId
+	req.UserID = user.ID
 	err = s.CardRepository.CreateCard(r.Context(), *req)
 	if err != nil {
 		logger.Error("[CreateCardHandler] CardRepository.CreateCard", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	WriteJSONResponse(w, http.StatusCreated, any(nil))
+	helpers.WriteJSONResponse(w, http.StatusCreated, any(nil))
 }
 
 func (s *Service) parseCreateCardRequest(ctx context.Context, r *http.Request) (*dto.CreateCardRequest, error) {
@@ -163,37 +172,41 @@ func (s *Service) UpdateCardHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseUpdateCardRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[UpdateCardHandler] Invalid request body", zap.Error(err))
-		WriteJSONError(w, http.StatusBadRequest, err)
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	// TODO: need logic enrich userID from token
-	userId := int32(0)
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[UpdateCardHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
+		return
+	}
 
 	card, err := s.CardRepository.GetDetailCard(r.Context(), req.ID)
 	if err != nil {
 		logger.Error("[UpdateCardHandler] CardRepository.GetDetailCard", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 	if card == nil {
 		logger.Error("[UpdateCardHandler] Card not found", zap.Int32("cardId", req.ID))
-		WriteJSONError(w, http.StatusNotFound, fmt.Errorf("card not found"))
+		helpers.WriteJSONError(w, http.StatusNotFound, fmt.Errorf("card not found"))
 		return
 	}
-	if card.UserID != userId {
-		logger.Error("[UpdateCardHandler] User does not have permission to update this card", zap.Int32("cardId", req.ID), zap.Int32("userId", userId))
-		WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to update this card"))
+	if card.UserID != user.ID {
+		logger.Error("[UpdateCardHandler] User does not have permission to update this card", zap.Int32("cardId", req.ID), zap.Int32("userId", user.ID))
+		helpers.WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to update this card"))
 		return
 	}
 
 	err = s.CardRepository.UpdateCard(r.Context(), *req)
 	if err != nil {
 		logger.Error("[UpdateCardHandler] CardRepository.UpdateCard", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
-	WriteJSONResponse(w, http.StatusOK, any(nil))
+	helpers.WriteJSONResponse(w, http.StatusOK, any(nil))
 }
 
 func (s *Service) parseUpdateCardRequest(ctx context.Context, r *http.Request) (*dto.UpdateCardRequest, error) {

@@ -1,7 +1,8 @@
 package dto
 
 type GetUserRequest struct {
-	ID int32 `json:"id"`
+	ID    int32
+	Email string
 }
 
 type GetUserResponse struct {
@@ -24,13 +25,12 @@ type CreateUserResponse struct {
 	ID int32 `json:"id"`
 }
 
-type UpdateUserRequest struct {
-	ID       int32  `json:"id"`
-	Name     string `json:"name"`
+type LoginRequest struct {
 	Email    string `json:"email"`
-	Password string `json:"password,omitempty"`
+	Password string `json:"password"`
 }
 
-type UpdateUserResponse struct {
-	ID int32 `json:"id"`
+type LoginResponse struct {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
 }

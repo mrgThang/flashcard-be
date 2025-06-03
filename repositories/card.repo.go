@@ -69,11 +69,11 @@ func (r *cardRepositoryImpl) GetCards(ctx context.Context, req dto.GetCardsReque
 		query = query.Where("back LIKE ?", "%"+req.Back+"%")
 	}
 
-	offset := constant.DEFAULT_OFFSET
+	offset := constant.DefaultOffset
 	if req.Page > 0 {
 		offset = (req.Page - 1) * req.PageSize
 	}
-	limit := constant.DEFAULT_LIMIT
+	limit := constant.DefaultLimit
 	if req.PageSize > 0 {
 		limit = req.PageSize
 	}

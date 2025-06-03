@@ -60,11 +60,11 @@ func (r *deckRepositoryImpl) GetDecksWithPagination(ctx context.Context, req dto
 	if req.UserID != 0 {
 		query = query.Where("user_id = ?", req.UserID)
 	}
-	offset := constant.DEFAULT_OFFSET
+	offset := constant.DefaultOffset
 	if req.Page > 0 {
 		offset = (req.Page - 1) * req.PageSize
 	}
-	limit := constant.DEFAULT_LIMIT
+	limit := constant.DefaultLimit
 	if req.PageSize > 0 {
 		limit = req.PageSize
 	}

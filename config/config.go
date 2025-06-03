@@ -1,8 +1,10 @@
 package config
 
 type Config struct {
-	MysqlConfig *MysqlConfig
-	Port        string
+	MysqlConfig      *MysqlConfig
+	Port             string
+	AccessKeySecret  string
+	RefreshKeySecret string
 }
 
 type MysqlConfig struct {
@@ -27,6 +29,8 @@ func loadDefaultConfig() *Config {
 			Password: "secret",
 			Database: "flashcard",
 		},
-		Port: "8080",
+		Port:             "8080",
+		AccessKeySecret:  "",
+		RefreshKeySecret: "",
 	}
 }

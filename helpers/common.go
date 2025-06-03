@@ -1,20 +1,16 @@
-package services
+package helpers
 
 import (
 	"encoding/json"
 	"net/http"
-)
 
-type ApiResponse[T any] struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    T      `json:"data"`
-}
+	"github.com/mrgThang/flashcard-be/dto"
+)
 
 func WriteJSONError(w http.ResponseWriter, code int, err error) {
 	w.WriteHeader(code)
 	w.Header().Set("Content-Type", "application/json")
-	response := ApiResponse[any]{
+	response := dto.ApiResponse[any]{
 		Code:    code,
 		Message: err.Error(),
 		Data:    nil,
@@ -27,7 +23,7 @@ func WriteJSONError(w http.ResponseWriter, code int, err error) {
 func WriteJSONResponse[T any](w http.ResponseWriter, code int, data T) {
 	w.WriteHeader(code)
 	w.Header().Set("Content-Type", "application/json")
-	response := ApiResponse[T]{
+	response := dto.ApiResponse[T]{
 		Code:    code,
 		Message: "Success",
 		Data:    data,

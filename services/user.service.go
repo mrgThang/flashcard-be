@@ -3,48 +3,33 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 
+	"github.com/mrgThang/flashcard-be/constant"
 	"github.com/mrgThang/flashcard-be/dto"
+	"github.com/mrgThang/flashcard-be/helpers"
 	"github.com/mrgThang/flashcard-be/logger"
 	"github.com/mrgThang/flashcard-be/models"
 )
 
 func (s *Service) GetUserHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseGetUserRequest(r.Context(), r)
-	if err != nil {
-		logger.Error("[GetUserHandler] Invalid request parameters", zap.Error(err))
-		WriteJSONError(w, http.StatusBadRequest, err)
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[GetUserHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
 		return
 	}
-
-	user, err := s.UserRepository.GetUser(r.Context(), *req)
-	if err != nil {
-		logger.Error("[GetUserHandler] UserRepository.GetUsers got error", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	response := s.parseGetUserResponse(*user)
-	WriteJSONResponse(w, http.StatusOK, response)
-}
-
-func (s *Service) parseGetUserRequest(ctx context.Context, r *http.Request) (*dto.GetUserRequest, error) {
-	idStr := r.URL.Query().Get("id")
-	if idStr == "" {
-		logger.Error("[parseGetUserRequest] Missing 'id' query parameter")
-		return nil, fmt.Errorf("missing 'id' query parameter")
-	}
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to convert id '%s' to int", idStr), zap.Error(err))
-		return nil, err
-	}
-	return &dto.GetUserRequest{ID: int32(id)}, nil
+	response := s.parseGetUserResponse(user)
+	helpers.WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (s *Service) parseGetUserResponse(user models.User) dto.GetUserResponse {
@@ -55,26 +40,35 @@ func (s *Service) parseGetUserResponse(user models.User) dto.GetUserResponse {
 	}}
 }
 
-func (s *Service) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseCreateUserRequest(r.Context(), r)
+func (s *Service) SignupHandler(w http.ResponseWriter, r *http.Request) {
+	req, err := s.parseSignupRequest(r.Context(), r)
 	if err != nil {
-		logger.Error("[CreateUserHandler] Invalid request body", zap.Error(err))
-		WriteJSONError(w, http.StatusBadRequest, err)
+		logger.Error("[SignUpHandler] Invalid request body", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
+	if err != nil {
+		logger.Error("[SignUpHandler] Hashing password gor error", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	req.Password = string(hash)
+
 	err = s.UserRepository.CreateUser(r.Context(), *req)
 	if err != nil {
-		logger.Error("[CreateUserHandler] UserRepository.CreateUser got error", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		logger.Error("[SignUpHandler] UserRepository.CreateUser got error", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
-	WriteJSONResponse(w, http.StatusOK, any(nil))
+	helpers.WriteJSONResponse(w, http.StatusOK, any(nil))
 }
 
-func (s *Service) parseCreateUserRequest(ctx context.Context, r *http.Request) (*dto.CreateUserRequest, error) {
+func (s *Service) parseSignupRequest(ctx context.Context, r *http.Request) (*dto.CreateUserRequest, error) {
 	var req dto.CreateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Error("[parseCreateUserRequest] Failed to decode request body", zap.Error(err))
+		logger.Error("[parseSignupRequest] Failed to decode request body", zap.Error(err))
 		return nil, err
 	}
 	if req.Name == "" {
@@ -89,27 +83,74 @@ func (s *Service) parseCreateUserRequest(ctx context.Context, r *http.Request) (
 	return &req, nil
 }
 
-func (s *Service) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := s.parseUpdateUserRequest(r.Context(), r)
+func (s *Service) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	req, err := s.parseLoginRequest(r.Context(), r)
 	if err != nil {
-		logger.Error("[UpdateUserHandler] Invalid request body", zap.Error(err))
-		WriteJSONError(w, http.StatusBadRequest, err)
+		logger.Error("[LoginHandler] Failed to parse request", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
-	err = s.UserRepository.UpdateUser(r.Context(), *req)
+
+	getUserReq := dto.GetUserRequest{
+		Email: req.Email,
+	}
+	user, err := s.UserRepository.GetUser(r.Context(), getUserReq)
 	if err != nil {
-		logger.Error("[UpdateUserHandler] UserRepository.UpdateUser got error", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Error("[LoginHandler] UserRepository.GetUser not found record", zap.Error(err))
+			helpers.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("email is not signed up yet"))
+			return
+		}
+		logger.Error("[LoginHandler] UserRepository.GetUser got error", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
-	WriteJSONResponse(w, http.StatusOK, any(nil))
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
+	if err != nil {
+		logger.Error("[LoginHandler] Invalid password", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		Subject:   strconv.FormatInt(int64(user.ID), 10),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+	})
+	accessTokenString, err := accessToken.SignedString([]byte(s.Config.AccessKeySecret))
+	if err != nil {
+		logger.Error("[LoginHandler] Failed to create accessToken", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		Subject:   strconv.FormatInt(int64(user.ID), 10),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
+	})
+	refreshTokenString, err := refreshToken.SignedString([]byte(s.Config.RefreshKeySecret))
+	if err != nil {
+		logger.Error("[LoginHandler] Failed to create refreshToken", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	helpers.WriteJSONResponse(w, http.StatusOK, dto.LoginResponse{
+		AccessToken:  accessTokenString,
+		RefreshToken: refreshTokenString,
+	})
 }
 
-func (s *Service) parseUpdateUserRequest(ctx context.Context, r *http.Request) (*dto.UpdateUserRequest, error) {
-	var req dto.UpdateUserRequest
+func (s *Service) parseLoginRequest(ctx context.Context, r *http.Request) (*dto.LoginRequest, error) {
+	var req *dto.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Error("[parseUpdateUserRequest] Failed to decode request body", zap.Error(err))
+		logger.Error("[parseLoginRequest] Failed to decode request body", zap.Error(err))
 		return nil, err
 	}
-	return &req, nil
+	if req.Email == "" {
+		return nil, fmt.Errorf("email is required")
+	}
+	if req.Password == "" {
+		return nil, fmt.Errorf("password is required")
+	}
+	return req, nil
 }

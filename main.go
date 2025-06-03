@@ -7,9 +7,11 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/mrgThang/flashcard-be/logger"
-	"github.com/mrgThang/flashcard-be/services"
 	"github.com/urfave/cli/v2"
+
+	"github.com/mrgThang/flashcard-be/logger"
+	"github.com/mrgThang/flashcard-be/middlewares"
+	"github.com/mrgThang/flashcard-be/services"
 )
 
 func main() {
@@ -58,19 +60,20 @@ func runServer() error {
 	v1 := chi.NewRouter()
 
 	// Deck routes
-	v1.Get("/decks", service.GetDecksHandler)
-	v1.Post("/decks", service.CreateDeckHandler)
-	v1.Put("/decks", service.UpdateDeckHandler)
+	v1.Get("/decks", middlewares.AuthMiddleware(service, service.GetDecksHandler))
+	v1.Post("/decks", middlewares.AuthMiddleware(service, service.CreateDeckHandler))
+	v1.Put("/decks", middlewares.AuthMiddleware(service, service.UpdateDeckHandler))
 
 	// Card routes
-	v1.Get("/cards", service.GetCardsHandler)
-	v1.Post("/cards", service.CreateCardHandler)
-	v1.Put("/cards", service.UpdateCardHandler)
+	v1.Get("/cards", middlewares.AuthMiddleware(service, service.GetCardsHandler))
+	v1.Post("/cards", middlewares.AuthMiddleware(service, service.CreateCardHandler))
+	v1.Put("/cards", middlewares.AuthMiddleware(service, service.UpdateCardHandler))
 
 	// User routes
-	v1.Get("/users", service.GetUserHandler)
-	v1.Post("/users", service.CreateUserHandler)
-	v1.Put("/users", service.UpdateUserHandler)
+	v1.Get("/users", middlewares.AuthMiddleware(service, service.GetUserHandler))
+
+	v1.Post("/signup", service.SignupHandler)
+	v1.Post("/login", service.LoginHandler)
 
 	// create prefix v1 for all routes
 	r.Mount("/v1", v1)

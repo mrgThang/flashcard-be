@@ -11,6 +11,7 @@ import (
 
 	"github.com/mrgThang/flashcard-be/constant"
 	"github.com/mrgThang/flashcard-be/dto"
+	"github.com/mrgThang/flashcard-be/helpers"
 	"github.com/mrgThang/flashcard-be/logger"
 	"github.com/mrgThang/flashcard-be/models"
 )
@@ -19,18 +20,22 @@ func (s *Service) GetDecksHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseGetDecksRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[GetDecksHandler] Invalid request parameters", zap.Error(err))
-		WriteJSONError(w, http.StatusBadRequest, err)
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	// TODO: need logic enrich userID from token
-	userId := int32(0)
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[GetDecksHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
+		return
+	}
 
-	req.UserID = userId
+	req.UserID = user.ID
 	decks, totalItems, err := s.DeckRepository.GetDecksWithPagination(r.Context(), *req)
 	if err != nil {
 		logger.Error("[GetDecksHandler] DeckRepository.GetDecks", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -39,7 +44,7 @@ func (s *Service) GetDecksHandler(w http.ResponseWriter, r *http.Request) {
 		PageSize:   req.PageSize,
 		TotalItems: totalItems,
 	})
-	WriteJSONResponse(w, http.StatusOK, response)
+	helpers.WriteJSONResponse(w, http.StatusOK, response)
 }
 
 func (s *Service) parseGetDecksRequest(ctx context.Context, r *http.Request) (*dto.GetDecksRequest, error) {
@@ -61,7 +66,7 @@ func (s *Service) parseGetDecksRequest(ctx context.Context, r *http.Request) (*d
 		}
 		req.Page = page
 	} else {
-		req.Page = constant.DEFAULT_PAGE
+		req.Page = constant.DefaultPage
 	}
 	if pageSizeStr := q.Get("pageSize"); pageSizeStr != "" {
 		pageSize, err := strconv.Atoi(pageSizeStr)
@@ -70,7 +75,7 @@ func (s *Service) parseGetDecksRequest(ctx context.Context, r *http.Request) (*d
 		}
 		req.PageSize = pageSize
 	} else {
-		req.PageSize = constant.DEFAULT_PAGE_SIZE
+		req.PageSize = constant.DefaultPageSize
 	}
 	return &req, nil
 }
@@ -97,17 +102,21 @@ func (s *Service) CreateDeckHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: need logic enrich userID from token
-	userId := int32(0)
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[CreateDeckHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
+		return
+	}
 
-	req.UserID = userId
+	req.UserID = user.ID
 	err = s.DeckRepository.CreateDeck(r.Context(), *req)
 	if err != nil {
 		logger.Error("[CreateDeckHandler] DeckRepository.CreateDeck got error", zap.Error(err))
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	WriteJSONResponse(w, http.StatusCreated, any(nil))
+	helpers.WriteJSONResponse(w, http.StatusCreated, any(nil))
 }
 
 func (s *Service) parseCreateDeckRequest(ctx context.Context, r *http.Request) (*dto.CreateDeckRequest, error) {
@@ -127,37 +136,41 @@ func (s *Service) UpdateDeckHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseUpdateDeckRequest(r.Context(), r)
 	if err != nil {
 		logger.Error("[UpdateDeckHandler] Invalid request body", zap.Error(err))
-		WriteJSONError(w, http.StatusBadRequest, err)
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	// TODO: need logic enrich userID from token
-	userId := int32(0)
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[UpdateDeckHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
+		return
+	}
 
 	deck, err := s.DeckRepository.GetDetailDeck(r.Context(), req.ID)
 	if err != nil {
 		logger.Error("[UpdateDeckHandler] DeckRepository.GetDetailDeck got error", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 	if deck == nil {
 		logger.Error("[UpdateDeckHandler] Deck not found", zap.Int32("deckId", req.ID))
-		WriteJSONError(w, http.StatusNotFound, fmt.Errorf("deck not found"))
+		helpers.WriteJSONError(w, http.StatusNotFound, fmt.Errorf("deck not found"))
 		return
 	}
-	if deck.UserID != userId {
-		logger.Error("[UpdateDeckHandler] User does not have permission to update this deck", zap.Int32("deckId", req.ID), zap.Int32("userId", userId))
-		WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to update this deck"))
+	if deck.UserID != user.ID {
+		logger.Error("[UpdateDeckHandler] User does not have permission to update this deck", zap.Int32("deckId", req.ID), zap.Int32("userId", user.ID))
+		helpers.WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to update this deck"))
 		return
 	}
 
 	err = s.DeckRepository.UpdateDeck(r.Context(), *req)
 	if err != nil {
 		logger.Error("[UpdateDeckHandler] DeckRepository.UpdateDeck got error", zap.Error(err))
-		WriteJSONError(w, http.StatusInternalServerError, err)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
-	WriteJSONResponse(w, http.StatusOK, any(nil))
+	helpers.WriteJSONResponse(w, http.StatusOK, any(nil))
 }
 
 func (s *Service) parseUpdateDeckRequest(ctx context.Context, r *http.Request) (*dto.UpdateDeckRequest, error) {

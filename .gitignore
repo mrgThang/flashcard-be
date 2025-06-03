@@ -3,3 +3,4 @@ config.yaml
 vendor
 .vscode
 mysql.session.sql
+.idea
