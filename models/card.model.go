@@ -18,4 +18,5 @@ type Card struct {
 	EasinessFactor   float32        `gorm:"not null;default:2.5"`
 	StudyTime        time.Time      `gorm:"DEFAULT_GENERATED;type:datetime;default:CURRENT_TIMESTAMP"`
 	RepetitionNumber int32          `gorm:"not null;default:0"`
+	IntervalNumber   int32          `gorm:"not null;default:0"`
 }

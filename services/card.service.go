@@ -301,7 +301,7 @@ func (s *Service) updateCardWithSm2Algorithm(card *models.Card, qualityOfRespons
 	q := qualityOfResponse
 	ef := card.EasinessFactor
 	n := card.RepetitionNumber
-	var i int32
+	i := card.IntervalNumber
 
 	ef = ef + (0.1 - (5.0-float32(q))*(0.08+(5.0-float32(q))*0.02))
 	if ef < 1.3 {
@@ -328,4 +328,5 @@ func (s *Service) updateCardWithSm2Algorithm(card *models.Card, qualityOfRespons
 	card.EasinessFactor = ef
 	card.StudyTime = time.Now().Add(24 * time.Duration(i) * time.Hour)
 	card.RepetitionNumber = n
+	card.IntervalNumber = i
 }

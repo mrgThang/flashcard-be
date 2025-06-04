@@ -1,0 +1,2 @@
+ALTER TABLE cards
+    ADD COLUMN interval_number INT NOT NULL DEFAULT 0;
