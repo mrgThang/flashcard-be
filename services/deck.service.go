@@ -97,7 +97,7 @@ func (s *Service) CreateDeckHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := s.parseCreateDeckRequest(r)
 	if err != nil {
 		logger.Error("[CreateDeckHandler] Invalid request body", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (s *Service) CreateDeckHandler(w http.ResponseWriter, r *http.Request) {
 	err = s.DeckRepository.CreateDeck(r.Context(), *req)
 	if err != nil {
 		logger.Error("[CreateDeckHandler] DeckRepository.CreateDeck got error", zap.Error(err))
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
 	helpers.WriteJSONResponse(w, http.StatusCreated, any(nil))

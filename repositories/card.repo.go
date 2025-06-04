@@ -14,9 +14,9 @@ import (
 
 type CardRepository interface {
 	CreateCard(ctx context.Context, req dto.CreateCardRequest, db ...*gorm.DB) error
-	UpdateCard(ctx context.Context, req dto.UpdateCardRequest, db ...*gorm.DB) error
 	GetCards(ctx context.Context, req dto.GetCardsRequest, db ...*gorm.DB) ([]*models.Card, int64, error)
 	GetDetailCard(ctx context.Context, id int32, dbs ...*gorm.DB) (*models.Card, error)
+	UpdateFullCard(cardToUpdate *models.Card, dbs ...*gorm.DB) error
 }
 
 type cardRepositoryImpl struct {
@@ -30,6 +30,7 @@ func NewCardRepository(db *gorm.DB) CardRepository {
 func (r *cardRepositoryImpl) CreateCard(ctx context.Context, req dto.CreateCardRequest, dbs ...*gorm.DB) error {
 	database := getDb(r.DB, dbs...)
 	card := models.Card{
+		UserID: req.UserID,
 		Front:  req.Front,
 		Back:   req.Back,
 		DeckID: req.DeckID,
@@ -37,16 +38,9 @@ func (r *cardRepositoryImpl) CreateCard(ctx context.Context, req dto.CreateCardR
 	return database.WithContext(ctx).Create(&card).Error
 }
 
-func (r *cardRepositoryImpl) UpdateCard(ctx context.Context, req dto.UpdateCardRequest, dbs ...*gorm.DB) error {
+func (r *cardRepositoryImpl) UpdateFullCard(cardToUpdate *models.Card, dbs ...*gorm.DB) error {
 	database := getDb(r.DB, dbs...)
-	updates := map[string]interface{}{}
-	if req.Front != "" {
-		updates["front"] = req.Front
-	}
-	if req.Back != "" {
-		updates["back"] = req.Back
-	}
-	return database.WithContext(ctx).Model(&models.Card{}).Where("id = ?", req.ID).Updates(updates).Error
+	return database.Save(cardToUpdate).Error
 }
 
 func (r *cardRepositoryImpl) GetCards(ctx context.Context, req dto.GetCardsRequest, dbs ...*gorm.DB) ([]*models.Card, int64, error) {
@@ -67,6 +61,9 @@ func (r *cardRepositoryImpl) GetCards(ctx context.Context, req dto.GetCardsReque
 	}
 	if req.Back != "" {
 		query = query.Where("back LIKE ?", "%"+req.Back+"%")
+	}
+	if req.StudyTimeTo != nil {
+		query = query.Where("study_time <= ?", req.StudyTimeTo)
 	}
 
 	offset := constant.DefaultOffset

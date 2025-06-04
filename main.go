@@ -70,6 +70,7 @@ func runServer() error {
 	v1.Get("/cards", middlewares.AuthMiddleware(service, service.GetCardsHandler))
 	v1.Post("/cards", middlewares.AuthMiddleware(service, service.CreateCardHandler))
 	v1.Put("/cards", middlewares.AuthMiddleware(service, service.UpdateCardHandler))
+	v1.Put("/cards/study", middlewares.AuthMiddleware(service, service.StudyCardHandler))
 
 	// User routes
 	v1.Get("/users", middlewares.AuthMiddleware(service, service.GetUserHandler))

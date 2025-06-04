@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 type CreateCardRequest struct {
 	Front  string `json:"front"`
 	Back   string `json:"back"`
@@ -14,13 +16,14 @@ type UpdateCardRequest struct {
 }
 
 type GetCardsRequest struct {
-	ID       int32
-	DeckID   int32
-	UserID   int32
-	Front    string
-	Back     string
-	Page     int
-	PageSize int
+	ID          int32
+	DeckID      int32
+	UserID      int32
+	Front       string
+	Back        string
+	Page        int
+	PageSize    int
+	StudyTimeTo *time.Time
 }
 
 type GetCardsResponse struct {
@@ -33,4 +36,9 @@ type CardItem struct {
 	Front  string `json:"front"`
 	Back   string `json:"back"`
 	DeckID int32  `json:"deckId"`
+}
+
+type StudyCardRequest struct {
+	CardId            int32 `json:"cardId"`
+	QualityOfResponse int32 `json:"qualityOfResponse"`
 }

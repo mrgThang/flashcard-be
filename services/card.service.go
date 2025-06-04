@@ -3,8 +3,10 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -83,6 +85,16 @@ func (s *Service) parseGetCardsRequest(r *http.Request) (*dto.GetCardsRequest, e
 		req.PageSize = pageSize
 	} else {
 		req.PageSize = constant.DefaultPageSize
+	}
+	if isForStudyStr := q.Get("isForStudy"); isForStudyStr != "" {
+		isForStudy, err := strconv.ParseBool(isForStudyStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid isForStudy")
+		}
+		if isForStudy {
+			now := time.Now()
+			req.StudyTimeTo = &now
+		}
 	}
 	return &req, nil
 }
@@ -199,9 +211,9 @@ func (s *Service) UpdateCardHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = s.CardRepository.UpdateCard(r.Context(), *req)
+	err = s.CardRepository.UpdateFullCard(card)
 	if err != nil {
-		logger.Error("[UpdateCardHandler] CardRepository.UpdateCard", zap.Error(err))
+		logger.Error("[UpdateCardHandler] CardRepository.UpdateFullCard", zap.Error(err))
 		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -219,4 +231,101 @@ func (s *Service) parseUpdateCardRequest(r *http.Request) (*dto.UpdateCardReques
 		return nil, fmt.Errorf("id is required")
 	}
 	return &req, nil
+}
+
+func (s *Service) StudyCardHandler(w http.ResponseWriter, r *http.Request) {
+	req, err := s.parseStudyCardRequest(r)
+	if err != nil {
+		logger.Error("[StudyCardHandler] Invalid request body", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[StudyCardHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
+		return
+	}
+
+	card, err := s.CardRepository.GetDetailCard(r.Context(), req.CardId)
+	if err != nil {
+		logger.Error("[StudyCardHandler] CardRepository.GetDetailCard", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if card == nil {
+		logger.Error("[StudyCardHandler] Card not found", zap.Int32("cardId", req.CardId))
+		helpers.WriteJSONError(w, http.StatusNotFound, fmt.Errorf("card not found"))
+		return
+	}
+	if card.UserID != user.ID {
+		logger.Error("[StudyCardHandler] User does not have permission to study this card", zap.Int32("cardId", req.CardId), zap.Int32("userId", user.ID))
+		helpers.WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to study this card"))
+		return
+	}
+
+	s.updateCardWithSm2Algorithm(card, req.QualityOfResponse)
+
+	err = s.CardRepository.UpdateFullCard(card)
+	if err != nil {
+		logger.Error("[StudyCardHandler] CardRepository.UpdateFullCard got error", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	response := map[string]interface{}{
+		"message": "Card studied successfully",
+	}
+	helpers.WriteJSONResponse(w, http.StatusOK, response)
+}
+
+func (s *Service) parseStudyCardRequest(r *http.Request) (*dto.StudyCardRequest, error) {
+	var req dto.StudyCardRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Error("[parseStudyCardRequest] Failed to decode request", zap.Error(err))
+		return nil, err
+	}
+	if req.CardId == 0 {
+		logger.Error("[parseStudyCardRequest] CardId is required")
+		return nil, fmt.Errorf("cardId is required")
+	}
+	if req.QualityOfResponse < 0 || req.QualityOfResponse > 5 {
+		logger.Error("[parseStudyCardRequest] QualityOfResponse must be between 0 and 5")
+		return nil, fmt.Errorf("qualityOfResponse must be between 0 and 5")
+	}
+	return &req, nil
+}
+
+func (s *Service) updateCardWithSm2Algorithm(card *models.Card, qualityOfResponse int32) {
+	q := qualityOfResponse
+	ef := card.EasinessFactor
+	n := card.RepetitionNumber
+	var i int32
+
+	ef = ef + (0.1 - (5.0-float32(q))*(0.08+(5.0-float32(q))*0.02))
+	if ef < 1.3 {
+		ef = 1.3
+	}
+
+	if q < 3 {
+		n = 0
+		i = 1
+	} else {
+		n += 1
+		if n == 1 {
+			i = 1
+		} else if n == 2 {
+			i = 6
+		} else {
+			i = int32(math.Round(float64(i) * float64(ef)))
+			if i < 1 {
+				i = 1
+			}
+		}
+	}
+
+	card.EasinessFactor = ef
+	card.StudyTime = time.Now().Add(24 * time.Duration(i) * time.Hour)
+	card.RepetitionNumber = n
 }

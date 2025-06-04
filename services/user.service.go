@@ -122,20 +122,9 @@ func (s *Service) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
 		return
 	}
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Subject:   strconv.FormatInt(int64(user.ID), 10),
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
-	})
-	refreshTokenString, err := refreshToken.SignedString([]byte(s.Config.RefreshKeySecret))
-	if err != nil {
-		logger.Error("[LoginHandler] Failed to create refreshToken", zap.Error(err))
-		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
-		return
-	}
 
 	helpers.WriteJSONResponse(w, http.StatusOK, dto.LoginResponse{
-		AccessToken:  accessTokenString,
-		RefreshToken: refreshTokenString,
+		AccessToken: accessTokenString,
 	})
 }
 
