@@ -26,6 +26,9 @@ type GetDecksResponse struct {
 }
 
 type DeckItem struct {
-	ID   int32  `json:"id"`
-	Name string `json:"name"`
+	ID          int32  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	TotalCards  int32  `json:"totalCards"`
+	CardsLeft   int32  `json:"cardsLeft"`
 }

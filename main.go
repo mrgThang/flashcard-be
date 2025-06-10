@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/urfave/cli/v2"
 
 	"github.com/mrgThang/flashcard-be/logger"
@@ -59,10 +60,20 @@ func runServer() error {
 
 	r := chi.NewRouter()
 
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+
 	v1 := chi.NewRouter()
 
 	// Deck routes
 	v1.Get("/decks", middlewares.AuthMiddleware(service, service.GetDecksHandler))
+	v1.Get("/decks/{id}", middlewares.AuthMiddleware(service, service.GetDetailDeckHandler))
 	v1.Post("/decks", middlewares.AuthMiddleware(service, service.CreateDeckHandler))
 	v1.Put("/decks", middlewares.AuthMiddleware(service, service.UpdateDeckHandler))
 

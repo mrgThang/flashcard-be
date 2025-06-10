@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
 	"github.com/mrgThang/flashcard-be/constant"
@@ -79,12 +80,15 @@ func (s *Service) parseGetDecksRequest(r *http.Request) (*dto.GetDecksRequest, e
 	return &req, nil
 }
 
-func (s *Service) parseGetDecksResponse(decks []*models.Deck, pagination dto.Pagination) dto.GetDecksResponse {
+func (s *Service) parseGetDecksResponse(decks []*models.DeckWithStats, pagination dto.Pagination) dto.GetDecksResponse {
 	deckItems := make([]dto.DeckItem, len(decks))
 	for i, deck := range decks {
 		deckItems[i] = dto.DeckItem{
-			ID:   deck.ID,
-			Name: deck.Name,
+			ID:          deck.ID,
+			Name:        deck.Name,
+			Description: deck.Description,
+			TotalCards:  deck.TotalCards,
+			CardsLeft:   deck.CardsLeft,
 		}
 	}
 	return dto.GetDecksResponse{
@@ -183,4 +187,57 @@ func (s *Service) parseUpdateDeckRequest(r *http.Request) (*dto.UpdateDeckReques
 		return nil, fmt.Errorf("ID is required")
 	}
 	return &req, nil
+}
+
+func (s *Service) GetDetailDeckHandler(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	if idStr == "" {
+		logger.Error("[GetDetailDeckHandler] id is required")
+		helpers.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("id is required"))
+		return
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		logger.Error("[GetDetailDeckHandler] invalid id", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid id"))
+		return
+	}
+	if id <= 0 {
+		logger.Error("[GetDetailDeckHandler] id is required")
+		helpers.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("id is required"))
+		return
+	}
+
+	user, ok := r.Context().Value(constant.UserContextKey).(models.User)
+	if !ok {
+		logger.Error("[GetDetailDeckHandler] Can not get user from context")
+		helpers.WriteJSONError(w, http.StatusInternalServerError, fmt.Errorf("can not get user from context"))
+		return
+	}
+
+	deck, err := s.DeckRepository.GetDetailDeck(r.Context(), int32(id))
+	if err != nil {
+		logger.Error("[GetDetailDeckHandler] DeckRepository.GetDetailDeck got error", zap.Error(err))
+		helpers.WriteJSONError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if deck == nil {
+		logger.Error("[GetDetailDeckHandler] Deck not found", zap.Int("deckId", id))
+		helpers.WriteJSONError(w, http.StatusNotFound, fmt.Errorf("deck not found"))
+		return
+	}
+	if deck.UserID != user.ID {
+		logger.Error("[GetDetailDeckHandler] User does not have permission to view this deck", zap.Int("deckId", id), zap.Int32("userId", user.ID))
+		helpers.WriteJSONError(w, http.StatusForbidden, fmt.Errorf("user does not have permission to view this deck"))
+		return
+	}
+
+	response := dto.DeckItem{
+		ID:          deck.ID,
+		Name:        deck.Name,
+		Description: deck.Description,
+		TotalCards:  deck.TotalCards,
+		CardsLeft:   deck.CardsLeft,
+	}
+	helpers.WriteJSONResponse(w, http.StatusOK, response)
 }

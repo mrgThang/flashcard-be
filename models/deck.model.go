@@ -15,3 +15,9 @@ type Deck struct {
 	UpdatedAt   time.Time      `gorm:"DEFAULT_GENERATED on update CURRENT_TIMESTAMP;type:datetime;default:CURRENT_TIMESTAMP"`
 	DeletedAt   gorm.DeletedAt `gorm:"index"`
 }
+
+type DeckWithStats struct {
+	Deck
+	TotalCards int32 `gorm:"column:total_cards"`
+	CardsLeft  int32 `gorm:"column:cards_left"`
+}
