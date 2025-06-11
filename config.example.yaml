@@ -1,12 +1,12 @@
 MYSQL_CONFIG:
   HOST: localhost
-  PORT: 3306
+  PORT: "3306"
   USERNAME: root
   PASSWORD: secret
   DATABASE: flashcard
   OPTIONS: parseTime=true
 
-PORT: 8080
+PORT: "8080"
 
-ACCESS_KEY_SECRET: 1
-REFRESH_KEY_SECRET: 2
+ACCESS_KEY_SECRET: fjoapsdifjodpfi
+REFRESH_KEY_SECRET: fahdfkajfhieu
