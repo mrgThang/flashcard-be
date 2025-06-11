@@ -3,7 +3,6 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -101,12 +100,22 @@ func (s *Service) parseGetCardsRequest(r *http.Request) (*dto.GetCardsRequest, e
 
 func (s *Service) parseGetCardsResponse(cards []*models.Card, pagination dto.Pagination) dto.GetCardsResponse {
 	cardItems := make([]dto.CardItem, len(cards))
-	for i, card := range cards {
-		cardItems[i] = dto.CardItem{
-			ID:     card.ID,
-			Front:  card.Front,
-			Back:   card.Back,
-			DeckID: card.DeckID,
+	for index, card := range cards {
+		ef := card.EasinessFactor
+		n := card.RepetitionNumber
+		i := card.IntervalNumber
+		_, _, _, first := helpers.ExecuteSm2Algo(1, ef, n, i)
+		_, _, _, second := helpers.ExecuteSm2Algo(2, ef, n, i)
+		_, _, _, third := helpers.ExecuteSm2Algo(3, ef, n, i)
+		_, _, _, fourth := helpers.ExecuteSm2Algo(4, ef, n, i)
+		estimatedTime := []int32{first, second, third, fourth}
+
+		cardItems[index] = dto.CardItem{
+			ID:            card.ID,
+			Front:         card.Front,
+			Back:          card.Back,
+			DeckID:        card.DeckID,
+			EstimatedTime: estimatedTime,
 		}
 	}
 	return dto.GetCardsResponse{
@@ -211,6 +220,9 @@ func (s *Service) UpdateCardHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	card.Front = req.Front
+	card.Back = req.Back
+
 	err = s.CardRepository.UpdateFullCard(card)
 	if err != nil {
 		logger.Error("[UpdateCardHandler] CardRepository.UpdateFullCard", zap.Error(err))
@@ -303,27 +315,7 @@ func (s *Service) updateCardWithSm2Algorithm(card *models.Card, qualityOfRespons
 	n := card.RepetitionNumber
 	i := card.IntervalNumber
 
-	ef = ef + (0.1 - (5.0-float32(q))*(0.08+(5.0-float32(q))*0.02))
-	if ef < 1.3 {
-		ef = 1.3
-	}
-
-	if q < 3 {
-		n = 0
-		i = 1
-	} else {
-		n += 1
-		if n == 1 {
-			i = 1
-		} else if n == 2 {
-			i = 6
-		} else {
-			i = int32(math.Round(float64(i) * float64(ef)))
-			if i < 1 {
-				i = 1
-			}
-		}
-	}
+	q, ef, n, i = helpers.ExecuteSm2Algo(q, ef, n, i)
 
 	card.EasinessFactor = ef
 	card.StudyTime = time.Now().Add(24 * time.Duration(i) * time.Hour)

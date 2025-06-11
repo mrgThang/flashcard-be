@@ -27,15 +27,16 @@ type GetCardsRequest struct {
 }
 
 type GetCardsResponse struct {
-	Pagination
-	Cards []CardItem `json:"cards"`
+	Pagination Pagination `json:"pagination"`
+	Cards      []CardItem `json:"cards"`
 }
 
 type CardItem struct {
-	ID     int32  `json:"id"`
-	Front  string `json:"front"`
-	Back   string `json:"back"`
-	DeckID int32  `json:"deckId"`
+	ID            int32   `json:"id"`
+	Front         string  `json:"front"`
+	Back          string  `json:"back"`
+	DeckID        int32   `json:"deckId"`
+	EstimatedTime []int32 `json:"estimatedTime"`
 }
 
 type StudyCardRequest struct {
